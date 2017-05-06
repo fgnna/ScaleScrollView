@@ -1,0 +1,14 @@
+*.iml
+.gradle
+/local.properties
+/.idea/workspace.xml
+/.idea/libraries
+/.idea
+.DS_Store
+/build
+freeline
+gradle
+freeline.py
+freeline_project_description.json
+/captures
+.externalNativeBuild
