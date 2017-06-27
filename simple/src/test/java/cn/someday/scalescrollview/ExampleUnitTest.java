@@ -14,4 +14,12 @@ public class ExampleUnitTest {
     public void addition_isCorrect() throws Exception {
         assertEquals(4, 2 + 2);
     }
+    @Test
+    public void test1() throws Exception
+    {
+        System.out.print(5.2f + 4 * 2 );
+    }
+
+
+
 }

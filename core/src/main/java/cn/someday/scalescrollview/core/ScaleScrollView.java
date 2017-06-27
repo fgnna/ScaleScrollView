@@ -14,8 +14,6 @@ import android.widget.LinearLayout;
 import cn.someday.scalescrollview.core.theme.BaseTheme;
 import cn.someday.scalescrollview.core.theme.SimpleTheme;
 
-import static android.R.attr.width;
-
 /**
  * 可滚动选择刻度值的控件
  * 提供：垂直/横向滚动，自定义样式
@@ -37,15 +35,22 @@ public class ScaleScrollView extends View
     public ScaleScrollView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {super(context, attrs, defStyleAttr);initialize();}
 
 
-    private int mMinValue;
-    private int mMaxValue;
-    private int mLargeAliquots;
-    private int mSmallAliquots;
+    private int mMinValue;//最小值
+    private int mMaxValue;//最大值
+    private int mLargeAliquots;//大等份数
+    private int mSmallAliquots;//小等份数
+    private float mLargeAverage;//大等份平均值
+    private float mSmallAverage;//小等份平均值
+    private BaseTheme mViewTheme;//刻度样式
 
     private int mOrientation;//滚动方向
 
     private float mCenterPrintX;//中心点 X
     private float mCenterPrintY;//中心点 Y
+    private int mCenterLineLength;//中线总长度
+    private int mHeight;
+    private int mWidth;
+    private float mMaxScroll;
 
     /**
      * 初始化view属性
@@ -87,8 +92,18 @@ public class ScaleScrollView extends View
      */
     public void setOption(int minValue,int maxValue,int largeAliquots,int smallAliquots)
     {
+        mMinValue = minValue;
+        mMaxValue = maxValue;
+        mLargeAliquots = largeAliquots;
+        mSmallAliquots = smallAliquots;
 
+        float count = maxValue - minValue;
+        if(count <= 0 )
+            throw new IllegalArgumentException("minValue不能大于或等于maxValue");
 
+        mLargeAverage = count / largeAliquots;
+        mSmallAverage = mLargeAverage / smallAliquots;
+        mCenterLineLength = largeAliquots * smallAliquots * mViewTheme.getSpace();
     }
 
     @Override
@@ -97,10 +112,11 @@ public class ScaleScrollView extends View
         super.onLayout(changed, left, top, right, bottom);
         if(mCenterPrintX == 0.0)
         {
-            float width = getWidth();
-            float height = getHeight();
-            mCenterPrintX = width/2;
-            mCenterPrintY = height/2;
+            mWidth = getWidth();
+            mHeight = getHeight();
+            mCenterPrintX = mWidth / 2;
+            mCenterPrintY = mHeight / 2;
+            mMaxScroll = mCenterLineLength - mCenterPrintX;
             postInvalidate();
         }
     }
@@ -110,17 +126,49 @@ public class ScaleScrollView extends View
     {
         if(mCenterPrintX == 0.0)
             return ;
-        float startx = mCenterPrintX - mCurrentScroll;
+        float startx = mCurrentScroll >= mCenterPrintX ? 0 : mCenterPrintX - mCurrentScroll;
         float starty = mCenterPrintY;
-        float stopx = getWidth();
+
+        float stopx = (mMaxScroll - mCurrentScroll) >= mCenterPrintX ? mWidth : mCenterLineLength - mCurrentScroll;
         float stopy = mCenterPrintY;
 
         canvas.drawLine(startx,starty,stopx,stopy,mCenterLinePaint);
+
+        /**
+         *  如果 当前滚动小于 中点值，从start开始计算
+         *  否则 当前滚动 减去 中点值，获取超出屏幕的部份 ，
+         *  超出屏部份 除以 每小格平均值，获得从 超出格数，
+         *  超出屏部份 模 每小格平均值，获得余数，每格平均值减去余数 即 start点
+         */
+        if(startx > 0)
+        {
+            for(int j = 1,i = mSmallAliquots * mLargeAliquots; j < i; j++)
+            {
+                if( (startx+ mViewTheme.getSpace()*j) > mWidth )
+                    break;
+                canvas.drawLine(startx+mViewTheme.getSpace()*j,mCenterPrintY-50,startx+mViewTheme.getSpace()*j,mCenterPrintY,mCenterLinePaint);
+            }
+        }
+        else
+        {
+            float outline = mCurrentScroll - mCenterPrintX;
+            int count = (int) (outline / mViewTheme.getSpace());
+            startx = mViewTheme.getSpace() - outline % mViewTheme.getSpace();
+
+            for(int j = 1,i = mSmallAliquots * mLargeAliquots - count; j < i; j++)
+            {
+                if( (startx+ mViewTheme.getSpace()*j) > mWidth )
+                    break;
+                canvas.drawLine(startx+mViewTheme.getSpace()*j,mCenterPrintY-50,startx+mViewTheme.getSpace()*j,mCenterPrintY,mCenterLinePaint);
+            }
+
+        }
+
+
+
     }
 
     private float mTempTouchXY;//最后滚动到的位置
-    private final int  mMinScroll = 0;
-    private int  mMaxScroll = 1080;
     private float mCurrentScroll = 0;//当前已滚动的路程
 
     @Override
@@ -139,9 +187,9 @@ public class ScaleScrollView extends View
                 //向右边滑动
                 if (dataX < 0)
                 {
-                    if(mCurrentScroll <= mMinScroll)
+                    if(mCurrentScroll <= 0)
                     {
-                        mCurrentScroll = mMinScroll;
+                        mCurrentScroll = 0;
                         Log.d(TAG,"右滑动 到底部"+mCurrentScroll);
                         return super.onTouchEvent(event);
                     }
@@ -191,6 +239,8 @@ public class ScaleScrollView extends View
      */
     public void setViewTheme(BaseTheme viewTheme)
     {
+        mViewTheme = viewTheme;
+
         // 画笔
         mCenterLinePaint = new Paint();
         mCenterLinePaint.setColor(Color.BLUE);
